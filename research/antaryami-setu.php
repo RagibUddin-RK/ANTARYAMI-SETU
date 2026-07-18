@@ -1418,7 +1418,7 @@ include '../components/head.php';
                 <a href="#architecture" class="btn btn-secondary">
                     <i class="fas fa-sitemap"></i> View Architecture
                 </a>
-                <a href="https://antaryami.ragibuddin.in/" class="btn btn-secondary" target="_blank" style="border-color: var(--accent); color: var(--accent); box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);">
+                <a href="https://yourdomain.com/" class="btn btn-secondary" target="_blank" style="border-color: var(--accent); color: var(--accent); box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);">
                     <i class="fas fa-gauge-high"></i> Launch Console
                 </a>
             </div>
