@@ -27,8 +27,9 @@ A standalone C# .NET 10.0 agent designed for local or direct-network administrat
 - Self-installs into `ProgramData` and registers for startup persistence via Windows Task Scheduler.
 - Runs completely silently in the background (Windowless).
 
-### 3. Online Agent (`/WinOnlineAgent` & `/MacOnlineAgent`) & PHP API
-C# .NET 10.0 agents designed for over-the-internet administration where direct TCP connections are not feasible (e.g., behind NAT/Firewalls).
+### 3. Online Agents (`/WinOnlineAgent` & `/MacOnlineAgent`) & PHP API
+C# .NET 10.0 agents designed for over-the-internet administration where direct TCP connections are not feasible (e.g., behind NAT/Firewalls). 
+Their sole responsibility is to run silently in the background, periodically pinging the central C2 server with telemetry so the administrator can see if the target device is online.
 - Polls a central web server (`api_setu.php`) for commands using standard HTTP POST/GET requests.
 - Avoids firewall blocks by blending in with regular web traffic.
 - **Dynamic Token Security**: The API is strictly secured via a dynamic session token architecture. Agents register with a low-privilege key and generate unique Session Tokens (`X-API-KEY`) per execution.
@@ -126,30 +127,36 @@ graph TD
 
 ---
 
-## ⚙️ Setup & Deployment
+## ⚙️ Detailed Setup & Deployment
 
-### 1. Admin Dashboard
+### 1. Admin Dashboard (Command & Control)
 1. Open `Admin/AntaryamiSetuAdmin.csproj` in Visual Studio.
 2. Build and run the project. The TCP server will automatically start listening on port `9999`.
 
-### 2. Offline Agent (Local Network)
+### 2. Offline Agent (Local Network Windows)
 1. Open `WinOfflineAgent/Program.cs`.
 2. Update the `ServerIp` variable to match the IPv4 address of the machine running the Admin Dashboard:
    ```csharp
    private static string ServerIp = "192.168.x.x"; // Your Admin IP
    ```
-3. Build the executable.
+3. Build the executable using the payload compiler or terminal (see Operational Guide below).
 
-### 3. Online Agent (Public Internet)
+### 3. Online Web Server (API Gate)
 1. Upload the `server setup/api_setu.php` file to your public web hosting directory (e.g., `public_html/api/api_setu.php`).
 2. **Crucial:** Upload the generated `.user.ini` and `.htaccess` files to the exact same folder on your web host to support large file uploads up to 2GB.
 3. **API Key Setup:** Open `api_setu.php` and set your Admin `$ADMIN_KEY` and Agent `$AGENT_REG_KEY` securely. Set up the Database variables `$db`, `$user`, and `$pass`.
-4. Open `WinOnlineAgent/Program.cs` and `MacOnlineAgent/Program.cs` and update the `ApiUrl`:
+
+### 4. Online Agents (Public Internet Windows & macOS)
+1. Open `WinOnlineAgent/Program.cs` and `MacOnlineAgent/Program.cs` and update the `ApiUrl`:
    ```csharp
    private static string ApiUrl = "https://yourdomain.com/api/api_setu.php";
    ```
-5. Open `Admin/dashboard.cs` and update the `ApiUrl` variable to point to the exact same URL so the Admin panel can manage the online agents.
-6. Build the executables.
+2. Open `Admin/dashboard.cs` and update the `ApiUrl` variable to point to the exact same URL so the Admin panel can manage the online agents.
+3. **API Key Security:** Ensure the registration `X-API-KEY` header in both agents matches the `$AGENT_REG_KEY` configured on your `api_setu.php` server:
+   ```csharp
+   _telemetryClient.DefaultRequestHeaders.Add("X-API-KEY", "YourSecretAgentKey");
+   ```
+4. Build the executables (see Operational Guide below).
 
 ---
 
@@ -167,7 +174,7 @@ To update target agents with large payload binaries without exhausting system me
 
 ### 3. macOS Windowless Stealth & Persistence
 *   **Stealth**: Packed inside a native `.app` bundle, containing plist attributes (`LSUIElement = true`) that prevent the app from spawning a Dock icon.
-*   **Persistence**: Integrates with macOS startup daemon structures by self-provisioning a LaunchAgent configuration file.
+*   **Persistence**: Integrates with macOS startup daemon structures by self-provisioning a LaunchAgent configuration file at `~/Library/LaunchAgents/com.antaryami.maconlineagent.plist`.
 
 ---
 
@@ -181,26 +188,41 @@ To update target agents with large payload binaries without exhausting system me
 
 ## 🛠️ Operational Guide & Troubleshooting
 
-### 1. Building Silent Executables (`.exe`)
-Both Windows agents can be compiled into standalone, single-file executables that run completely silently in the background:
+### 1. Building Silent Windows Executables (`WinOfflineAgent` & `WinOnlineAgent`)
+Both Windows agents can be compiled into standalone, single-file executables that run completely silently in the background. Open your terminal in the agent's folder and run:
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:AssemblyName=CustomAgentName
 ```
+This produces an `.exe` file that drops into `ProgramData` and registers an invisible scheduled task.
 
-### 2. macOS Agent Compilation (`build_app.sh`)
-The macOS agent requires compilation and packaging into a `.app` bundle.
+### 2. Building the macOS App Bundle (`MacOnlineAgent`)
+We have provided an automated build script `build_app.sh` that compiles the C# program and packages it into a native macOS App Bundle (`.app`) that supports both Apple Silicon (M1/M2) and Intel architectures (Universal Binary).
+
 ```bash
 cd MacOnlineAgent
 chmod +x build_app.sh
 ./build_app.sh
 ```
-This script compiles binaries for Apple Silicon (`osx-arm64`) and Intel (`osx-x64`) and merges them into a **Universal Binary** `.app` bundle.
+* **Running the App**: Launch it by double-clicking `MacOnlineAgent.app` in Finder, or from the terminal using `open MacOnlineAgent.app`. No window or Dock icon will appear.
+
+If you want to build a raw standalone single-file binary manually (without the `.app` bundle wrapper):
+* **Apple Silicon:** `dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true -p:AssemblyName=CustomAgentName`
+* **Intel:** `dotnet publish -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true -p:AssemblyName=CustomAgentName`
 
 ### 3. Agent Uninstallation & Clean Deletion
-**Windows:**
-Delete the Scheduled Tasks and Registry Run keys created under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+
+**Windows (Online & Offline):**
+Delete the Scheduled Tasks and Registry Run keys created under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, and kill the process.
+```cmd
+reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "AntaryamiSetuAgent" /f
+reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "AntaryamiSetuOnlineAgent" /f
+schtasks /delete /tn "OnlineAgentTask" /f
+schtasks /delete /tn "AntaryamiSetuAgentTask" /f
+cmd /c "timeout /t 3 & del /f /q %CD%\AntaryamiSetuAgent.exe"
+```
 
 **macOS:**
+Since there is no UI, you must stop the agent and delete its persistence from the terminal:
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.antaryami.maconlineagent.plist
 rm -f ~/Library/LaunchAgents/com.antaryami.maconlineagent.plist
