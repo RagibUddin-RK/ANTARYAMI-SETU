@@ -6,6 +6,9 @@
 ## 📖 Executive Summary
 **ANTARYAMI-SETU** (meaning *"Omniscient Bridge"* or *"Inner Controller Bridge"* in Sanskrit) is an advanced, high-tech Remote Administration Tool (RAT) and Command & Control (C2) ecosystem. Engineered for high-fidelity endpoint monitoring and operational orchestration, the suite supports dual-mode communication paradigms: direct low-latency **TCP sockets** (for Local Area Networks/LAN) and RESTful **HTTP/S polling** (for Wide Area Networks/WAN). 
 
+* **Developer:** [Ragib Uddin (RK)](https://ragibuddin.in)
+* **Detailed Documentation & Research:** [Read the full research paper here](https://ragibuddin.in/research/antaryami-setu)
+
 The ecosystem provides native administrative control over both Windows and macOS target platforms. Featuring a premium, sci-fi cyber-hacker aesthetic (HUD styling, glassmorphism, animated radar circles, and real-time visualization graphs), the suite provides administrators with an immersive operational dashboard to control target environments, exfiltrate strategic intelligence, and capture live telemetry.
 
 ---
