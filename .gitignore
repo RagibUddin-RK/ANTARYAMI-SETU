@@ -1,0 +1,37 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+dist/
+build/
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# .NET
+bin/
+obj/
+.vs/
+bin/
+obj/
+bin/
+obj/
+.vs/

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>MacOnlineAgent</AssemblyName>
+  </PropertyGroup>  <ItemGroup>
+    <PackageReference Include="Obfuscar" Version="2.2.38">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <Target Name="Obfuscate" AfterTargets="AfterBuild" Condition="'$(PublishProtocol)' == '' And '$(Configuration)' == 'Debug'">
+    <Message Text="Running Obfuscar to protect the macOS agent code..." Importance="high" />
+    <Exec Command="$(Obfuscar) obfuscar.xml" />
+    <Copy SourceFiles="$(TargetDir)MacOnlineAgent;$(TargetDir)MacOnlineAgent.exe;$(TargetDir)MacOnlineAgent.runtimeconfig.json" DestinationFolder="$(TargetDir)Obfuscated" SkipUnchangedFiles="true" ContinueOnError="true" />
+  </Target>
+
+</Project>

@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>OnlineAgent</AssemblyName>
+    <SupportedOSPlatform>windows</SupportedOSPlatform>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Admin\**" />
+    <Content Remove="Admin\**" />
+    <EmbeddedResource Remove="Admin\**" />
+    <None Remove="Admin\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Speech" Version="10.0.0" />
+    <PackageReference Include="Obfuscar" Version="2.2.38">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <Target Name="Obfuscate" AfterTargets="AfterBuild" Condition="'$(PublishProtocol)' == '' And '$(Configuration)' == 'Debug'">
+    <Message Text="Running Obfuscar to protect the agent code..." Importance="high" />
+    <Exec Command="$(Obfuscar) obfuscar.xml" />
+    <Copy SourceFiles="$(TargetDir)OnlineAgent.exe;$(TargetDir)OnlineAgent.runtimeconfig.json" DestinationFolder="$(TargetDir)Obfuscated" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
