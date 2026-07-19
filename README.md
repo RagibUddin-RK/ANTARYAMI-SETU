@@ -1,4 +1,4 @@
-![Alternative Text](path/to/image.png)
+![Alternative Text](workflow.png)
 # 🌌 ANTARYAMI-SETU (अन्तर्यामी सेतु)
 ### *Omniscient Bridge - High-Tech Remote Administration & C2 Command Suite*
 
