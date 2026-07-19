@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="logo.png" alt="Antaryami Setu Logo" width="400">
-</p>
+
 ![Alternative Text](workflow.png)
 # 🌌 ANTARYAMI-SETU (अन्तर्यामी सेतु)
 ### *Omniscient Bridge - High-Tech Remote Administration & C2 Command Suite*
