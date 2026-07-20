@@ -109,7 +109,7 @@ namespace AntaryamiSetuAdmin
         }
         
         public static readonly HttpClient _httpClient = new HttpClient();
-        public static string ApiUrl = "https://yourdomain.com/api/api_setu.php";
+        public static string ApiUrl = "https://antaryami.uno/api/api_setu.php";
 
         static DashboardForm()
         {
@@ -134,13 +134,13 @@ namespace AntaryamiSetuAdmin
         }
         private System.Windows.Forms.Timer _httpTimer = new System.Windows.Forms.Timer();
 
-        private readonly Color ColBg     = Color.FromArgb(5, 5, 5);
-        private readonly Color ColPanel  = Color.FromArgb(20, 20, 20);
-        private readonly Color ColGreen  = Color.FromArgb(0, 255, 64);
-        private readonly Color ColCyan   = Color.FromArgb(0, 200, 255);
-        private readonly Color ColRed    = Color.FromArgb(220, 30, 30);
-        private readonly Color ColOrange = Color.FromArgb(255, 160, 30);
-        private readonly Color ColGray   = Color.FromArgb(120, 120, 120);
+        private readonly Color ColBg     = Color.FromArgb(13, 17, 23);
+        private readonly Color ColPanel  = Color.FromArgb(22, 27, 34);
+        private readonly Color ColGreen  = Color.FromArgb(46, 160, 67);
+        private readonly Color ColCyan   = Color.FromArgb(88, 166, 255);
+        private readonly Color ColRed    = Color.FromArgb(248, 81, 73);
+        private readonly Color ColOrange = Color.FromArgb(210, 153, 34);
+        private readonly Color ColGray   = Color.FromArgb(139, 148, 158);
 
         private Label? _lblStats;
         private Image? _bgImage;
@@ -154,8 +154,9 @@ namespace AntaryamiSetuAdmin
         
         // Traffic monitor state
         private long _bytesTransferredThisSecond = 0;
-        private System.Collections.Generic.List<int> _trafficHistory = new();
-        private System.Windows.Forms.Timer _trafficTimer = new();
+        private System.Collections.Generic.List<string> _activityLogs = new();
+        private System.Windows.Forms.Timer _trafficTimer = new System.Windows.Forms.Timer();
+        private System.Windows.Forms.Timer _animTimer = new System.Windows.Forms.Timer();
 
         public DashboardForm()
         {
@@ -164,21 +165,26 @@ namespace AntaryamiSetuAdmin
             StartServerBackground();
             InitIdleTracking();
             
-            // Pre-fill traffic history with zeros
-            for (int i = 0; i < 40; i++) _trafficHistory.Add(0);
+            // Initialize activity logs
+            lock (_activityLogs)
+            {
+                _activityLogs.Add($"[{DateTime.Now:HH:mm:ss}] SYSTEM: Antaryami-Setu Core Online.");
+                _activityLogs.Add($"[{DateTime.Now:HH:mm:ss}] SYSTEM: Listening for nodes...");
+            }
             
             _trafficTimer.Interval = 1000;
             _trafficTimer.Tick += (s, e) => {
-                lock (_trafficHistory)
-                {
-                    _trafficHistory.RemoveAt(0);
-                    _trafficHistory.Add((int)(System.Threading.Interlocked.Read(ref _bytesTransferredThisSecond) / 1024)); // Store as KB/s
-                    System.Threading.Interlocked.Exchange(ref _bytesTransferredThisSecond, 0);
-                }
+                System.Threading.Interlocked.Exchange(ref _bytesTransferredThisSecond, 0);
+            };
+            _trafficTimer.Start();
+
+            // 60FPS Animation timer for smooth cyber graphics
+            _animTimer.Interval = 16;
+            _animTimer.Tick += (s, e) => {
                 _pnlTraffic?.Invalidate();
                 _pnlMap?.Invalidate();
             };
-            _trafficTimer.Start();
+            _animTimer.Start();
 
             _httpTimer.Interval = 5000;
             _httpTimer.Tick += async (s, e) => await FetchHttpDevicesAsync();
@@ -256,14 +262,14 @@ namespace AntaryamiSetuAdmin
         // ════════════════════════════════════════════════════════════════════════
         private void InitializeGUI()
         {
-            this.Text = "ANTARYAMI - DASHBOARD";
-            this.Size = new Size(1200, 800);
+            this.Text = "ANTARYAMI-SETU - COMMAND CENTER";
+            this.Size = new Size(1300, 850);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.None; // Borderless
-            this.WindowState = FormWindowState.Normal;
-            this.BackColor = Color.FromArgb(15, 15, 15);
+            this.FormBorderStyle = FormBorderStyle.Sizable;
+            this.WindowState = FormWindowState.Normal; // Start as normal window
+            this.BackColor = ColBg;
             this.ForeColor = ColGreen;
-            this.Font = new Font("Segoe UI", 10F);
+            this.Font = new Font("Consolas", 9F);
             this.DoubleBuffered = true;
 
             try {
@@ -278,133 +284,141 @@ namespace AntaryamiSetuAdmin
                 }
             } catch { }
 
-            // ── Top Title Bar ────────────────────────────────────────────────
-            Panel pnlTopBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Color.FromArgb(20, 20, 20) };
+            if (_bgImage != null)
+            {
+                // Background image removed for cleaner solid color theme
+                // this.BackgroundImage = _bgImage;
+                // this.BackgroundImageLayout = ImageLayout.Stretch;
+            }
+
+            // ── Sidebar ───────────────────────────────────────────────────────
+            Panel pnlSidebar = new Panel { Dock = DockStyle.Left, Width = 230, BackColor = Color.FromArgb(220, 10, 10, 10), Padding = new Padding(10) };
             
-            Label lblAppIcon = new Label { Text = "⚡", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = ColCyan, Location = new Point(10, 8), AutoSize = true };
-            Label lblTitle = new Label { Text = "ANTARYAMI COMMAND CENTER", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.WhiteSmoke, Location = new Point(35, 10), AutoSize = true };
-            
-            _lblStats = new Label { Text = "NODES: 0  |  ACTIVE: 0  |  SIGNAL: ENCRYPTED", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = ColGreen, AutoSize = true, Location = new Point(300, 11) };
-            _lblClock = new Label { Text = "", Font = new Font("Consolas", 10F), ForeColor = ColGray, AutoSize = true, Location = new Point(650, 11) };
-
-            Button btnClose = new Button { Text = "✕", BackColor = Color.Transparent, ForeColor = Color.WhiteSmoke, FlatStyle = FlatStyle.Flat, Size = new Size(40, 40), Dock = DockStyle.Right, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.Click += (s, e) => this.Close();
-            btnClose.MouseEnter += (s, e) => btnClose.BackColor = ColRed;
-            btnClose.MouseLeave += (s, e) => btnClose.BackColor = Color.Transparent;
-
-            Button btnMax = new Button { Text = "🗖", BackColor = Color.Transparent, ForeColor = Color.WhiteSmoke, FlatStyle = FlatStyle.Flat, Size = new Size(40, 40), Dock = DockStyle.Right, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
-            btnMax.FlatAppearance.BorderSize = 0;
-            btnMax.Click += (s, e) => { this.WindowState = this.WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized; };
-            btnMax.MouseEnter += (s, e) => btnMax.BackColor = Color.FromArgb(40, 40, 40);
-            btnMax.MouseLeave += (s, e) => btnMax.BackColor = Color.Transparent;
-
-            Button btnMin = new Button { Text = "🗕", BackColor = Color.Transparent, ForeColor = Color.WhiteSmoke, FlatStyle = FlatStyle.Flat, Size = new Size(40, 40), Dock = DockStyle.Right, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
-            btnMin.FlatAppearance.BorderSize = 0;
-            btnMin.Click += (s, e) => { this.WindowState = FormWindowState.Minimized; };
-            btnMin.MouseEnter += (s, e) => btnMin.BackColor = Color.FromArgb(40, 40, 40);
-            btnMin.MouseLeave += (s, e) => btnMin.BackColor = Color.Transparent;
-
-            pnlTopBar.Controls.Add(lblAppIcon);
-            pnlTopBar.Controls.Add(lblTitle);
-            pnlTopBar.Controls.Add(_lblStats);
-            pnlTopBar.Controls.Add(_lblClock);
-            pnlTopBar.Controls.Add(btnMin);
-            pnlTopBar.Controls.Add(btnMax);
-            pnlTopBar.Controls.Add(btnClose);
-            MakeDraggable(pnlTopBar);
-            MakeDraggable(lblTitle);
-            MakeDraggable(_lblStats);
-            MakeDraggable(_lblClock);
-
-            // ── Left Sidebar ────────────────────────────────────────────────
-            Panel pnlSidebar = new Panel { Dock = DockStyle.Left, Width = 250, BackColor = Color.FromArgb(10, 10, 10), Padding = new Padding(10) };
-            
-            Label lblLogo = new Label { Text = "A N T A R Y A M I", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = ColGreen, Dock = DockStyle.Top, Height = 60, TextAlign = ContentAlignment.MiddleCenter };
-            Label lblSubTitle = new Label { Text = "[ OMNIVISION NETWORK ]", Font = new Font("Segoe UI", 9F, FontStyle.Regular), ForeColor = ColCyan, Dock = DockStyle.Top, Height = 30, TextAlign = ContentAlignment.TopCenter };
+            Label lblLogo = new Label { Text = "ANTARYAMI-SETU", Font = new Font("Consolas", 18F, FontStyle.Bold), ForeColor = ColGreen, Dock = DockStyle.Top, Height = 60, TextAlign = ContentAlignment.MiddleCenter };
+            Label lblSubTitle = new Label { Text = "[ ALPHA_BUILD ]", Font = new Font("Consolas", 9F, FontStyle.Bold), ForeColor = ColCyan, Dock = DockStyle.Top, Height = 30, TextAlign = ContentAlignment.TopCenter };
             
             pnlSidebar.Controls.Add(lblSubTitle);
             pnlSidebar.Controls.Add(lblLogo);
-
-            Panel pnlNavButtons = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 30, 0, 0) };
             
+            // Sidebar Buttons
             Button btnBuild = MakeNavBtn("⚙ BUILD PAYLOAD", ColCyan);
-            btnBuild.Click += BtnBuild_Click;
-            btnBuild.Dock = DockStyle.Top;
-            
-            Panel pnlSpacer1 = new Panel { Height = 10, Dock = DockStyle.Top };
-            
             Button btnDevices = MakeNavBtn("📡 VIEW DEVICES", ColGreen);
-            btnDevices.Click += (s, e) =>
-            {
+            _btnAutoLock = MakeNavBtn("⏱ AUTO-LOCK: ON", ColOrange);
+            _btnLock = MakeNavBtn("🔒 LOCK SYSTEM", ColCyan);
+            Button btnLogout = MakeNavBtn("⏻ DISCONNECT", ColRed);
+
+            // Add events
+            btnBuild.Click += BtnBuild_Click;
+            btnDevices.Click += (s, e) => {
                 DevicesForm devForm = new DevicesForm();
                 devForm.Icon = this.Icon;
                 devForm.Show();
             };
-            btnDevices.Dock = DockStyle.Top;
-            
-            Panel pnlSpacer2 = new Panel { Height = 10, Dock = DockStyle.Top };
-            
-            _btnAutoLock = MakeNavBtn("⏱ AUTO-LOCK: ON", ColOrange);
-            _btnAutoLock.Click += (s, e) =>
-            {
+            _btnAutoLock.Click += (s, e) => {
                 _autoLockEnabled = !_autoLockEnabled;
                 _lastActivity = DateTime.Now;
                 UpdateAutoLockBtn();
             };
-            _btnAutoLock.Dock = DockStyle.Top;
-            
-            _btnLock = MakeNavBtn("🔒 LOCK DASHBOARD", ColCyan);
             _btnLock.Click += (s, e) => LockDashboard();
-            _btnLock.Dock = DockStyle.Bottom;
-            
-            Panel pnlSpacer3 = new Panel { Height = 10, Dock = DockStyle.Bottom };
-            
-            Button btnLogout = MakeNavBtn("⏻ LOGOUT", ColRed);
             btnLogout.Click += (s, e) => this.Close();
-            btnLogout.Dock = DockStyle.Bottom;
-            
-            pnlNavButtons.Controls.Add(_btnAutoLock);
-            pnlNavButtons.Controls.Add(pnlSpacer2);
-            pnlNavButtons.Controls.Add(btnDevices);
-            pnlNavButtons.Controls.Add(pnlSpacer1);
-            pnlNavButtons.Controls.Add(btnBuild);
-            
-            pnlNavButtons.Controls.Add(_btnLock);
-            pnlNavButtons.Controls.Add(pnlSpacer3);
-            pnlNavButtons.Controls.Add(btnLogout);
 
-            pnlSidebar.Controls.Add(pnlNavButtons);
+            // Reverse order because of Dock = Top
+            pnlSidebar.Controls.Add(btnLogout);
+            pnlSidebar.Controls.Add(new Panel { Height = 10, Dock = DockStyle.Top, BackColor = Color.Transparent });
+            pnlSidebar.Controls.Add(_btnLock);
+            pnlSidebar.Controls.Add(new Panel { Height = 10, Dock = DockStyle.Top, BackColor = Color.Transparent });
+            pnlSidebar.Controls.Add(_btnAutoLock);
+            pnlSidebar.Controls.Add(new Panel { Height = 10, Dock = DockStyle.Top, BackColor = Color.Transparent });
+            pnlSidebar.Controls.Add(btnDevices);
+            pnlSidebar.Controls.Add(new Panel { Height = 10, Dock = DockStyle.Top, BackColor = Color.Transparent });
+            pnlSidebar.Controls.Add(btnBuild);
+            pnlSidebar.Controls.Add(new Panel { Height = 40, Dock = DockStyle.Top, BackColor = Color.Transparent }); // padding below logo
 
-            // ── Main Content Area ───────────────────────────────────────────
-            Panel pnlMain = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Padding = new Padding(15) };
-            if (_bgImage != null)
+            // ── Main Content Area ─────────────────────────────────────────────
+            Panel pnlMain = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+
+            // Header Top Bar
+            Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.FromArgb(190, 5, 5, 5) };
+            
+            Label lblNavTitle = new Label { Text = "OMNIVISION NETWORK", Font = new Font("Consolas", 16F, FontStyle.Bold), ForeColor = ColGreen, AutoSize = true, Location = new Point(20, 18) };
+            _lblStats = new Label { Text = "NODES: 0  |  ACTIVE: 0  |  SIGNAL: ENCRYPTED", Font = new Font("Consolas", 10F, FontStyle.Bold), ForeColor = Color.DarkSeaGreen, AutoSize = true, Location = new Point(300, 22) };
+            _lblClock = new Label { Text = "", Font = new Font("Consolas", 11F, FontStyle.Bold), ForeColor = ColGray, Anchor = AnchorStyles.Top | AnchorStyles.Right, AutoSize = true, Location = new Point(pnlHeader.Width - 300, 22) };
+
+            pnlHeader.Controls.Add(lblNavTitle);
+            pnlHeader.Controls.Add(_lblStats);
+            pnlHeader.Controls.Add(_lblClock);
+
+            // Handle Resize for Anchor right elements gracefully
+            pnlHeader.Resize += (s, e) => {
+                if (_lblClock != null)
+                    _lblClock.Location = new Point(pnlHeader.Width - _lblClock.Width - 20, 22);
+            };
+
+            // Dashboard Grid (TableLayoutPanel)
+            TableLayoutPanel grid = new TableLayoutPanel
             {
-                pnlMain.BackgroundImage = _bgImage;
-                pnlMain.BackgroundImageLayout = ImageLayout.Stretch;
-            }
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 2,
+                Padding = new Padding(15),
+                BackColor = Color.Transparent
+            };
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 45F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 55F));
 
-            _btopPanel = new BtopPanel { Dock = DockStyle.Fill, Padding = new Padding(0) };
-            pnlMain.Controls.Add(_btopPanel);
+            // Traffic Panel
+            _pnlTraffic = new Panel { Dock = DockStyle.Fill, Margin = new Padding(10), BackColor = Color.FromArgb(200, 10, 10, 10) };
+            _pnlTraffic.Paint += PnlTraffic_Paint;
+            Label lblTraffic = new Label { Text = "LIVE ACTIVITY FEED", ForeColor = ColCyan, Font = new Font("Consolas", 11F, FontStyle.Bold), Dock = DockStyle.Top, Height = 30, TextAlign = ContentAlignment.MiddleCenter };
+            _pnlTraffic.Controls.Add(lblTraffic);
+
+            // Map Panel
+            _pnlMap = new Panel { Dock = DockStyle.Fill, Margin = new Padding(10), BackColor = Color.FromArgb(200, 10, 10, 10) };
+            _pnlMap.Paint += PnlMap_Paint;
+            Label lblMap = new Label { Text = "CYBER TOPOLOGY - LIVE", ForeColor = ColGreen, Font = new Font("Consolas", 11F, FontStyle.Bold), Dock = DockStyle.Top, Height = 30, TextAlign = ContentAlignment.MiddleCenter };
+            _pnlMap.Controls.Add(lblMap);
+
+            // Btop Panel
+            _btopPanel = new BtopPanel { Dock = DockStyle.Fill, Margin = new Padding(10), Padding = new Padding(5) };
+
+            grid.Controls.Add(_pnlTraffic, 0, 0);
+            grid.Controls.Add(_pnlMap, 1, 0);
+            grid.Controls.Add(_btopPanel, 0, 1);
+            grid.SetColumnSpan(_btopPanel, 2);
+
+            pnlMain.Controls.Add(grid);
+            pnlMain.Controls.Add(pnlHeader);
 
             this.Controls.Add(pnlMain);
             this.Controls.Add(pnlSidebar);
-            this.Controls.Add(pnlTopBar);
+
+            // Make Draggable
+            MakeDraggable(pnlHeader);
+            MakeDraggable(lblNavTitle);
+            MakeDraggable(pnlSidebar);
+            MakeDraggable(lblLogo);
         }
 
         private Button MakeNavBtn(string text, Color fore)
         {
             var btn = new Button
             {
-                Text = text, BackColor = Color.FromArgb(20, 20, 20), ForeColor = fore,
-                FlatStyle = FlatStyle.Flat, Height = 50, Cursor = Cursors.Hand,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Text = text,
+                BackColor = Color.FromArgb(30, 30, 30),
+                ForeColor = fore,
+                FlatStyle = FlatStyle.Flat,
+                Height = 45,
+                Dock = DockStyle.Top,
+                Cursor = Cursors.Hand,
+                Font = new Font("Consolas", 10F, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(15, 0, 0, 0)
             };
             btn.FlatAppearance.BorderSize = 0;
-            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(35, 35, 35);
-            btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(15, 15, 15);
+            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(60, 60, 60);
+            btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(20, 20, 20);
             return btn;
         }
 
@@ -417,7 +431,7 @@ namespace AntaryamiSetuAdmin
                     if (this.WindowState == FormWindowState.Maximized)
                     {
                         this.WindowState = FormWindowState.Normal;
-                        this.Size = new Size(1100, 750);
+                        this.Size = new Size(1300, 850);
                         this.StartPosition = FormStartPosition.CenterScreen;
                     }
                     ReleaseCapture();
@@ -430,7 +444,7 @@ namespace AntaryamiSetuAdmin
                 if (this.WindowState == FormWindowState.Maximized)
                 {
                     this.WindowState = FormWindowState.Normal;
-                    this.Size = new Size(1100, 750);
+                    this.Size = new Size(1300, 850);
                 }
                 else
                 {
@@ -530,13 +544,11 @@ namespace AntaryamiSetuAdmin
             {
                 _btnAutoLock.Text = "⏱ AUTO-LOCK: ON";
                 _btnAutoLock.ForeColor = ColOrange;
-                _btnAutoLock.FlatAppearance.BorderColor = ColOrange;
             }
             else
             {
                 _btnAutoLock.Text = "⏱ AUTO-LOCK: OFF";
                 _btnAutoLock.ForeColor = ColGray;
-                _btnAutoLock.FlatAppearance.BorderColor = ColGray;
             }
         }
 
@@ -632,6 +644,10 @@ namespace AntaryamiSetuAdmin
                     var session = new ClientSession { Client = client, Stream = client.GetStream(), EndPoint = epStr };
                     Sessions[epStr] = session;
                     _ = Task.Run(() => ResolveGeoIPAsync(session));
+                    
+                    lock (_activityLogs) {
+                        _activityLogs.Add($"[{DateTime.Now:HH:mm:ss}] [+] Target Connected: {epStr}");
+                    }
 
                     _ = Task.Run(() => Console.Beep(1200, 150));
                     _ = Task.Run(() => ReceivePacketsAsync(session));
@@ -727,6 +743,10 @@ namespace AntaryamiSetuAdmin
                     session.IsActive = false;
                     Invoke(new Action(() => {
                         Sessions.TryRemove(session.EndPoint, out _);
+                        lock (_activityLogs) {
+                            string name = session.DeviceName == "Scanning..." ? session.EndPoint : session.DeviceName;
+                            _activityLogs.Add($"[{DateTime.Now:HH:mm:ss}] [-] Target Disconnected: {name}");
+                        }
                         UpdateNodeUI();
                     }));
                     if (session.OnDisconnected != null) session.OnDisconnected.Invoke();
@@ -765,6 +785,7 @@ namespace AntaryamiSetuAdmin
             _clockTimer.Stop();
             _httpTimer.Stop();
             _trafficTimer.Stop();
+            _animTimer.Stop();
             if (_kbHook != IntPtr.Zero) UnhookWindowsHookEx(_kbHook);
             if (_mHook  != IntPtr.Zero) UnhookWindowsHookEx(_mHook);
 
@@ -781,61 +802,49 @@ namespace AntaryamiSetuAdmin
 
             Rectangle rect = _pnlTraffic!.ClientRectangle;
             
-            // Draw glassmorphic border
-            using (Pen borderPen = new Pen(Color.FromArgb(40, ColCyan), 1))
+            // Clean subtle border
+            using (Pen borderPen = new Pen(Color.FromArgb(40, 255, 255, 255), 1))
             {
                 g.DrawRectangle(borderPen, 0, 0, rect.Width - 1, rect.Height - 1);
             }
             
-            // Draw background grid lines
-            using (Pen gridPen = new Pen(Color.FromArgb(10, ColCyan), 1))
+            // Draw realistic grid lines
+            using (Pen gridPen = new Pen(Color.FromArgb(15, 255, 255, 255), 1))
             {
-                for (int x = 40; x < rect.Width; x += 40)
+                gridPen.DashStyle = DashStyle.Dash;
+                for (int x = 60; x < rect.Width; x += 60)
                     g.DrawLine(gridPen, x, 0, x, rect.Height);
                 for (int y = 30; y < rect.Height; y += 30)
                     g.DrawLine(gridPen, 0, y, rect.Width, y);
             }
 
-            // Draw real-time scrolling wave area graph
-            lock (_trafficHistory)
+            // Draw Live Activity Feed
+            lock (_activityLogs)
             {
-                if (_trafficHistory.Count < 2) return;
-                
-                int maxVal = _trafficHistory.Max();
-                if (maxVal < 10) maxVal = 10; // Default scale limit
-
-                PointF[] points = new PointF[_trafficHistory.Count];
-                PointF[] fillPoints = new PointF[_trafficHistory.Count + 2];
-
-                for (int i = 0; i < _trafficHistory.Count; i++)
+                using (Font logFont = new Font("Consolas", 9F))
+                using (SolidBrush logBrush = new SolidBrush(Color.FromArgb(200, 255, 255, 255)))
+                using (SolidBrush newBrush = new SolidBrush(ColCyan))
+                using (SolidBrush grnBrush = new SolidBrush(ColGreen))
+                using (SolidBrush redBrush = new SolidBrush(ColRed))
                 {
-                    float x = (float)i / (_trafficHistory.Count - 1) * (rect.Width - 20) + 10;
-                    float y = rect.Height - 20 - ((float)_trafficHistory[i] / maxVal * (rect.Height - 40));
-                    points[i] = new PointF(x, y);
-                    fillPoints[i] = new PointF(x, y);
-                }
+                    int startY = 40;
+                    int maxLines = (rect.Height - 50) / 18;
+                    
+                    int startIndex = Math.Max(0, _activityLogs.Count - maxLines);
+                    int currentY = startY;
 
-                fillPoints[_trafficHistory.Count] = new PointF(points[points.Length - 1].X, rect.Height - 10);
-                fillPoints[_trafficHistory.Count + 1] = new PointF(points[0].X, rect.Height - 10);
-
-                using (var fillBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
-                    new Point(0, 0), new Point(0, rect.Height),
-                    Color.FromArgb(60, ColCyan), Color.FromArgb(0, ColCyan)))
-                {
-                    g.FillPolygon(fillBrush, fillPoints);
-                }
-
-                using (Pen curvePen = new Pen(ColCyan, 2))
-                {
-                    g.DrawCurve(curvePen, points);
-                }
-                
-                using (Font speedFont = new Font("Consolas", 10F, FontStyle.Bold))
-                using (SolidBrush textBrush = new SolidBrush(Color.White))
-                {
-                    int currentSpeed = _trafficHistory[_trafficHistory.Count - 1];
-                    g.DrawString($"LIVE: {currentSpeed} KB/s", speedFont, textBrush, 15, 15);
-                    g.DrawString($"PEAK: {maxVal} KB/s", speedFont, textBrush, rect.Width - 140, 15);
+                    for (int i = startIndex; i < _activityLogs.Count; i++)
+                    {
+                        string log = _activityLogs[i];
+                        Brush textBrush = logBrush;
+                        
+                        if (log.Contains("[+]")) textBrush = grnBrush;
+                        else if (log.Contains("[-]")) textBrush = redBrush;
+                        else if (log.Contains("SYSTEM:")) textBrush = newBrush;
+                        
+                        g.DrawString(log, logFont, textBrush, 15, currentY);
+                        currentY += 18;
+                    }
                 }
             }
         }
@@ -846,88 +855,50 @@ namespace AntaryamiSetuAdmin
 
             Rectangle rect = _pnlMap!.ClientRectangle;
             
-            // Draw glassmorphic border
-            using (Pen borderPen = new Pen(Color.FromArgb(40, ColCyan), 1))
+            using (Pen borderPen = new Pen(Color.FromArgb(40, 255, 255, 255), 1))
             {
                 g.DrawRectangle(borderPen, 0, 0, rect.Width - 1, rect.Height - 1);
             }
 
-            // Draw a high-tech scanning grid background
-            using (Pen gridPen = new Pen(Color.FromArgb(8, ColCyan), 1))
+            // Draw a subtle latitude/longitude background grid
+            using (Pen gridPen = new Pen(Color.FromArgb(10, 255, 255, 255), 1))
             {
-                for (int x = 20; x < rect.Width; x += 20)
+                for (int x = 20; x < rect.Width; x += 40)
                     g.DrawLine(gridPen, x, 0, x, rect.Height);
-                for (int y = 20; y < rect.Height; y += 20)
+                for (int y = 20; y < rect.Height; y += 40)
                     g.DrawLine(gridPen, 0, y, rect.Width, y);
-            }
-
-            // Relative continental coordinates scaled to 100x100 grid
-            PointF[] northAmerica = {
-                new PointF(5, 12), new PointF(25, 10), new PointF(38, 20), new PointF(32, 42),
-                new PointF(25, 45), new PointF(18, 32), new PointF(10, 25)
-            };
-            PointF[] southAmerica = {
-                new PointF(25, 45), new PointF(34, 48), new PointF(32, 65), new PointF(26, 85),
-                new PointF(22, 75), new PointF(23, 58)
-            };
-            PointF[] eurasia = {
-                new PointF(38, 12), new PointF(75, 8), new PointF(92, 15), new PointF(95, 38),
-                new PointF(85, 45), new PointF(70, 48), new PointF(52, 38), new PointF(42, 32)
-            };
-            PointF[] africa = {
-                new PointF(42, 38), new PointF(58, 38), new PointF(62, 52), new PointF(54, 72),
-                new PointF(48, 70), new PointF(44, 50)
-            };
-            PointF[] australia = {
-                new PointF(82, 60), new PointF(92, 62), new PointF(90, 75), new PointF(80, 72)
-            };
-            PointF[][] continents = { northAmerica, southAmerica, eurasia, africa, australia };
-
-            PointF[] ScalePolygon(PointF[] poly)
-            {
-                PointF[] scaled = new PointF[poly.Length];
-                for (int i = 0; i < poly.Length; i++)
-                {
-                    scaled[i] = new PointF(
-                        poly[i].X / 100f * (rect.Width - 20) + 10,
-                        poly[i].Y / 100f * (rect.Height - 20) + 10
-                    );
-                }
-                return scaled;
             }
 
             if (_worldMapImage != null)
             {
-                g.DrawImage(_worldMapImage, rect);
-            }
-            else
-            {
-                using (SolidBrush landBrush = new SolidBrush(Color.FromArgb(12, 0, 200, 255)))
-                using (Pen landPen = new Pen(Color.FromArgb(60, ColCyan), 1))
-                {
-                    foreach (var continent in continents)
-                    {
-                        PointF[] scaledPoly = ScalePolygon(continent);
-                        g.FillPolygon(landBrush, scaledPoly);
-                        g.DrawPolygon(landPen, scaledPoly);
-                    }
-                }
+                // Draw map faded out
+                System.Drawing.Imaging.ImageAttributes attrs = new System.Drawing.Imaging.ImageAttributes();
+                System.Drawing.Imaging.ColorMatrix matrix = new System.Drawing.Imaging.ColorMatrix(new float[][] {
+                    new float[] {1, 0, 0, 0, 0},
+                    new float[] {0, 1, 0, 0, 0},
+                    new float[] {0, 0, 1, 0, 0},
+                    new float[] {0, 0, 0, 0.2f, 0},
+                    new float[] {0, 0, 0, 0, 1}
+                });
+                attrs.SetColorMatrix(matrix);
+                g.DrawImage(_worldMapImage, rect, 0, 0, _worldMapImage.Width, _worldMapImage.Height, GraphicsUnit.Pixel, attrs);
             }
 
-            PointF centerPoint = new PointF(56f / 100f * (rect.Width - 20) + 10, 32f / 100f * (rect.Height - 20) + 10);
+            PointF centerPoint = new PointF(56f / 100f * rect.Width, 35f / 100f * rect.Height);
             
-            using (Pen centerPen = new Pen(Color.FromArgb(150, Color.Orange), 1))
-            using (SolidBrush centerBrush = new SolidBrush(Color.Orange))
+            // Draw Center Hub
+            using (SolidBrush hubBrush = new SolidBrush(Color.FromArgb(200, 255, 255, 255)))
             {
-                g.DrawEllipse(centerPen, centerPoint.X - 6, centerPoint.Y - 6, 12, 12);
-                g.FillEllipse(centerBrush, centerPoint.X - 3, centerPoint.Y - 3, 6, 6);
+                g.FillEllipse(hubBrush, centerPoint.X - 3, centerPoint.Y - 3, 6, 6);
+                g.DrawEllipse(Pens.White, centerPoint.X - 8, centerPoint.Y - 8, 16, 16);
             }
 
-            int pulseSize = 4 + (int)(Math.Abs(Math.Sin(DateTime.Now.Millisecond / 150.0)) * 6);
-            
             foreach (var kvp in Sessions)
             {
                 var s = kvp.Value;
+                int hash = s.DeviceId.GetHashCode();
+                Random clientRand = new Random(hash);
+                
                 float rx, ry;
                 if (s.IsGeoResolved)
                 {
@@ -936,81 +907,57 @@ namespace AntaryamiSetuAdmin
                 }
                 else
                 {
-                    int hash = s.DeviceId.GetHashCode();
-                    Random clientRand = new Random(hash);
                     rx = 10 + clientRand.Next(5, 85);
                     ry = 15 + clientRand.Next(5, 65);
                 }
                 
-                PointF clientPoint = new PointF(rx / 100f * (rect.Width - 20) + 10, ry / 100f * (rect.Height - 20) + 10);
-                
+                PointF clientPoint = new PointF(rx / 100f * rect.Width, ry / 100f * rect.Height);
                 Color nodeColor = s.IsHttp ? ColCyan : ColGreen;
 
-                using (Pen linePen = new Pen(Color.FromArgb(40, nodeColor), 1))
+                // Draw parabolic arc connecting center to client
+                using (Pen arcPen = new Pen(Color.FromArgb(80, nodeColor), 1.5f))
                 {
-                    linePen.DashStyle = DashStyle.Dash;
-                    g.DrawLine(linePen, centerPoint, clientPoint);
+                    float midX = (centerPoint.X + clientPoint.X) / 2;
+                    float midY = (centerPoint.Y + clientPoint.Y) / 2;
+                    float dist = (float)Math.Sqrt(Math.Pow(clientPoint.X - centerPoint.X, 2) + Math.Pow(clientPoint.Y - centerPoint.Y, 2));
+                    
+                    float peakY = midY - (dist * 0.2f);
+                    PointF[] curvePoints = { centerPoint, new PointF(midX, peakY), clientPoint };
+                    g.DrawCurve(arcPen, curvePoints);
                 }
 
-                using (SolidBrush pulseBrush = new SolidBrush(Color.FromArgb(50, nodeColor)))
+                // Draw active node
                 using (SolidBrush nodeBrush = new SolidBrush(nodeColor))
                 {
-                    if (s.IsHttp)
-                    {
-                        // WAN Target: Diamond shape
-                        PointF[] pulseDiamond = {
-                            new PointF(clientPoint.X, clientPoint.Y - pulseSize),
-                            new PointF(clientPoint.X + pulseSize, clientPoint.Y),
-                            new PointF(clientPoint.X, clientPoint.Y + pulseSize),
-                            new PointF(clientPoint.X - pulseSize, clientPoint.Y)
-                        };
-                        g.FillPolygon(pulseBrush, pulseDiamond);
-                        
-                        PointF[] coreDiamond = {
-                            new PointF(clientPoint.X, clientPoint.Y - 3),
-                            new PointF(clientPoint.X + 3, clientPoint.Y),
-                            new PointF(clientPoint.X, clientPoint.Y + 3),
-                            new PointF(clientPoint.X - 3, clientPoint.Y)
-                        };
-                        g.FillPolygon(nodeBrush, coreDiamond);
-                    }
-                    else
-                    {
-                        // LAN Target: Circle shape
-                        g.FillEllipse(pulseBrush, clientPoint.X - pulseSize, clientPoint.Y - pulseSize, pulseSize * 2, pulseSize * 2);
-                        g.FillEllipse(nodeBrush, clientPoint.X - 3, clientPoint.Y - 3, 6, 6);
-                    }
+                    g.FillEllipse(nodeBrush, clientPoint.X - 3, clientPoint.Y - 3, 6, 6);
+                }
+                
+                // Draw floating tooltip for realism
+                using (Font tipFont = new Font("Segoe UI", 7F))
+                using (SolidBrush tipBrush = new SolidBrush(Color.LightGray))
+                {
+                    string ipLabel = string.IsNullOrEmpty(s.DeviceName) || s.DeviceName == "Scanning..." 
+                        ? (s.EndPoint.Contains(":") ? s.EndPoint.Split(':')[0] : s.EndPoint)
+                        : s.DeviceName;
+                    g.DrawString(ipLabel, tipFont, tipBrush, clientPoint.X + 5, clientPoint.Y - 10);
                 }
             }
 
-            // Draw Legend in bottom-left corner of the map
-            using (Font fLegend = new Font("Consolas", 8F))
-            using (SolidBrush bWhite = new SolidBrush(Color.White))
+            // Draw Legend in bottom-left corner
+            using (Font fLegend = new Font("Segoe UI", 8F))
+            using (SolidBrush bWhite = new SolidBrush(Color.FromArgb(200, 255, 255, 255)))
             {
                 int legX = 20;
                 int legY = rect.Height - 55;
                 
-                // Command Center Indicator
-                using (SolidBrush cc = new SolidBrush(Color.Orange))
-                    g.FillEllipse(cc, legX, legY + 2, 6, 6);
-                g.DrawString("COMMAND CENTER", fLegend, bWhite, legX + 15, legY);
+                using (SolidBrush cc = new SolidBrush(Color.White)) g.FillEllipse(cc, legX, legY + 2, 6, 6);
+                g.DrawString("HUB (COMMAND CENTER)", fLegend, bWhite, legX + 15, legY);
 
-                // LAN Target Indicator
-                using (SolidBrush lan = new SolidBrush(ColGreen))
-                    g.FillEllipse(lan, legX, legY + 17, 6, 6);
-                g.DrawString("LAN TARGET (TCP SOCKET)", fLegend, bWhite, legX + 15, legY + 15);
+                using (SolidBrush lan = new SolidBrush(ColGreen)) g.FillEllipse(lan, legX, legY + 17, 6, 6);
+                g.DrawString("TCP (DIRECT SOCKET)", fLegend, bWhite, legX + 15, legY + 15);
 
-                // WAN/Web Target Indicator
-                using (SolidBrush web = new SolidBrush(ColCyan))
-                {
-                    PointF[] tri = {
-                        new PointF(legX + 3, legY + 29),
-                        new PointF(legX, legY + 35),
-                        new PointF(legX + 6, legY + 35)
-                    };
-                    g.FillPolygon(web, tri);
-                }
-                g.DrawString("ONLINE TARGET (HTTP WEB)", fLegend, bWhite, legX + 15, legY + 30);
+                using (SolidBrush web = new SolidBrush(ColCyan)) g.FillEllipse(web, legX, legY + 32, 6, 6);
+                g.DrawString("HTTP (REMOTE WEB)", fLegend, bWhite, legX + 15, legY + 30);
             }
         }
 
